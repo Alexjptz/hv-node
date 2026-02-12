@@ -59,8 +59,24 @@ def add_user_via_api(user_uuid: str, email: str | None = None) -> tuple[bool, bo
             break
 
     if not vless_inbound:
-        logger.error("VLESS inbound not found")
-        return False, False  # success=False, used_grpc=False
+        # Config has wrong protocol (e.g. VMess instead of VLESS Reality) — replace with default
+        logger.warning("VLESS inbound not found, replacing config with VLESS Reality default")
+        from app.services.xray_manager import get_default_config, save_xray_config, validate_xray_config
+        from app.services.xray_manager import reload_xray
+
+        default_config = get_default_config()
+        valid, err = validate_xray_config(default_config)
+        if not valid:
+            logger.error("Default config validation failed", error=err)
+            return False, False
+
+        save_xray_config(default_config)
+        if not reload_xray():
+            logger.error("Failed to reload XRay with new config")
+            return False, False
+
+        logger.info("XRay config replaced with VLESS Reality, retrying add_user")
+        return add_user_via_api(user_uuid, email)  # Retry once with new config
 
     # Check if user already exists (by UUID)
     clients = vless_inbound.get("settings", {}).get("clients", [])
