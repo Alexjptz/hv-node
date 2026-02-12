@@ -29,13 +29,14 @@ def load_xray_config() -> dict[str, Any]:
     with open(config_path, "r", encoding="utf-8") as f:
         config = json.load(f)
 
-    # Миграция: maxTimeDiff 0 → 300 (рассинхрон даёт timeout)
+    # Миграция: maxTimeDiff 0 или 300 → 30 (баланс безопасность/совместимость)
     for inbound in config.get("inbounds", []):
         if inbound.get("protocol") == "vless":
             reality = inbound.get("streamSettings", {}).get("realitySettings", {})
-            if reality.get("maxTimeDiff") == 0:
-                reality["maxTimeDiff"] = 300
-                logger.info("Migrated maxTimeDiff 0→300 (fix timeout from time drift)")
+            current = reality.get("maxTimeDiff")
+            if current in (0, 300):
+                reality["maxTimeDiff"] = 30
+                logger.info("Migrated maxTimeDiff %s→30 (replay protection)", current)
                 try:
                     save_xray_config(config)
                     reload_xray()
@@ -278,7 +279,7 @@ def get_default_config() -> dict[str, Any]:
                         "privateKey": private_key_base64,  # Private key in base64 format for XRay Reality (XRay requires base64, not hex!)
                         "minClientVer": "",
                         "maxClientVer": "",
-                        "maxTimeDiff": 300,  # 5 min tolerance — рассинхрон сервер/клиент даёт timeout (0=disabled, 60=strict)
+                        "maxTimeDiff": 30,  # 30 sec — баланс replay protection / time drift (0=off, 60=strict)
                         "shortIds": short_ids  # List of short IDs
                     },
                     "tcpSettings": {
