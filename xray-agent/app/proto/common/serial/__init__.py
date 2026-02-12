@@ -1,0 +1,1 @@
+"""Common serial proto modules."""
