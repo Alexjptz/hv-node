@@ -230,7 +230,7 @@ services:
       start_period: 40s
 
   xray-server:
-    image: teddysun/xray:v1.8.11
+    image: teddysun/xray:1.8.11
     container_name: homevpn_xray_server
     ports:
       - "433:433"
