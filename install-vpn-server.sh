@@ -46,7 +46,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Переменные
-INSTALL_DIR="/root/homevpn-vpn-server"
+INSTALL_DIR="/root/hv-node"
 GITHUB_REPO="https://github.com/Alexjptz/hv-node.git"
 BRANCH="main"
 
@@ -150,7 +150,7 @@ echo ""
 step "Шаг 5/8: Подготовка файлов VPN сервера..."
 if [ -d "$INSTALL_DIR" ]; then
     warning "Директория $INSTALL_DIR уже существует"
-    read -p "Перезаписать? (y/N): " -n 1 -r
+    read -p "Перезаписать? (y/N): " -n 1 -r < /dev/tty
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         rm -rf "$INSTALL_DIR"
@@ -266,22 +266,22 @@ PUBLIC_IP=$(get_public_ip)
 
 if [ -z "$PUBLIC_IP" ]; then
     warning "Не удалось определить публичный IP автоматически"
-    read -p "Введите публичный IP сервера: " PUBLIC_IP
+    read -p "Введите публичный IP сервера: " PUBLIC_IP < /dev/tty
 fi
 
 info "Введите данные для подключения к Core API:"
-read -p "CORE_API_URL (например, https://api.example.com:8000): " CORE_API_URL
+read -p "CORE_API_URL (например, https://api.example.com:8000): " CORE_API_URL < /dev/tty
 if [ -z "$CORE_API_URL" ]; then
     error "CORE_API_URL обязателен. Без него агент не сможет подключиться к Core API."
     exit 1
 fi
-read -p "CORE_API_IP (IP Core API для доступа к агенту, обязательно): " CORE_API_IP
+read -p "CORE_API_IP (IP Core API для доступа к агенту, обязательно): " CORE_API_IP < /dev/tty
 if [ -z "$CORE_API_IP" ]; then
     error "CORE_API_IP обязателен. Без него Core API не сможет обращаться к агенту."
     exit 1
 fi
-read -p "AGENT_API_KEY (получите из админ-панели после создания сервера): " AGENT_API_KEY
-read -p "SERVER_ID (ID сервера из базы данных): " SERVER_ID
+read -p "AGENT_API_KEY (получите из админ-панели после создания сервера): " AGENT_API_KEY < /dev/tty
+read -p "SERVER_ID (ID сервера из базы данных): " SERVER_ID < /dev/tty
 
 AGENT_URL="http://${PUBLIC_IP}:8080"
 

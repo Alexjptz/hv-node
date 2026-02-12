@@ -39,7 +39,7 @@ curl -sSL https://raw.githubusercontent.com/Alexjptz/hv-node/main/install-vpn-se
 
 ## Шаг 3. Проверить, что всё запущено
 ```bash
-cd /root/homevpn-vpn-server
+cd /root/hv-node
 docker compose ps
 curl http://localhost:8080/health
 ```
