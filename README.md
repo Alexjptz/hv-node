@@ -1,10 +1,11 @@
-# V-node
+# VPN Server: просто и по шагам
 
-Пакет для поднятия ноды в один клик. Подключается к Core API и управляется через панель.
+Этот каталог — отдельный пакет для поднятия VPN-ноды.
+Идея: у вас есть приватный `core-api`, а этот пакет можно вынести в публичный репозиторий и ставить новые VPN-серверы одной командой.
 
 ## Что здесь находится
 - `install-vpn-server.sh` — основной установщик (ставит Docker, поднимает `xray-server` + `xray-agent`, создает `.env`, настраивает firewall)
-- `setup-vpn-server.sh` — дополнительное усиление безопасности хоста (fail2ban, SSH hardening, portsentry, sysctl, iptables)
+- `security-setup.sh` — настройка безопасности (fail2ban, SSH hardening, portsentry, sysctl). Запускать после install.
 - `xray-agent/` — код агента, который регистрируется в Core API и принимает команды
 
 ## Что нужно подготовить заранее
@@ -22,7 +23,7 @@ ssh root@YOUR_SERVER_IP
 
 ## Шаг 2. Установить VPN-ноду (основной шаг)
 ```bash
-curl -sSL https://raw.githubusercontent.com/Alexjptz/hv-node/main/install-vpn-server.sh | bash
+curl -sSL https://raw.githubusercontent.com/<org>/<repo>/main/vpn-server/install-vpn-server.sh | bash
 ```
 
 Скрипт спросит:
@@ -49,13 +50,13 @@ curl http://localhost:8080/health
 - health check возвращает `{"status":"healthy","service":"xray-agent"}`
 
 ## Шаг 4 (опционально, но рекомендуется). Усилить безопасность хоста
+После установки install предложит запустить настройку безопасности. Или вручную:
 ```bash
-curl -sSL https://raw.githubusercontent.com/Alexjptz/hv-node/main/setup-vpn-server.sh -o setup-vpn-server.sh
-chmod +x setup-vpn-server.sh
-sudo ./setup-vpn-server.sh --prod
+cd /root/hv-node
+sudo ./security-setup.sh --prod
 ```
 
-Этот шаг настраивает:
+Скрипт уже в репозитории (install делает его исполняемым). Настраивает:
 - fail2ban
 - SSH только по ключам
 - portsentry
@@ -63,8 +64,9 @@ sudo ./setup-vpn-server.sh --prod
 
 ## Что актуально использовать
 - Для запуска новой ноды: `install-vpn-server.sh`
-- Для дополнительной защиты после запуска: `setup-vpn-server.sh`
+- Для дополнительной защиты после запуска: `security-setup.sh`
 
 ## Важно
 - Текущий рабочий VPN-порт в установщике: `433` (TCP/UDP)
 - Порт `8080` не открыт в интернет, доступ только с `CORE_API_IP`
+- Для отделения в отдельный репозиторий достаточно перенести весь каталог `vpn-server/`
