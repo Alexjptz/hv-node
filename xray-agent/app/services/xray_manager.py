@@ -264,7 +264,7 @@ def get_default_config() -> dict[str, Any]:
                         "privateKey": private_key_base64,  # Private key in base64 format for XRay Reality (XRay requires base64, not hex!)
                         "minClientVer": "",
                         "maxClientVer": "",
-                        "maxTimeDiff": 0,  # Maximum time difference in seconds (0 = disabled for troubleshooting)
+                        "maxTimeDiff": 300,  # 5 min tolerance — рассинхрон сервер/клиент даёт timeout (0=disabled, 60=strict)
                         "shortIds": short_ids  # List of short IDs
                     },
                     "tcpSettings": {

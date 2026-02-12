@@ -2,7 +2,7 @@
 # 🚀 HomeVPN - Автоустановщик VPN сервера
 # Быстрая установка и настройка VPN сервера с XRay Agent
 #
-# Использование (публичный репо):
+# Использование:
 #   curl -sSL https://raw.githubusercontent.com/Alexjptz/hv-node/main/install-vpn-server.sh | bash
 #   или
 #   wget -qO- https://raw.githubusercontent.com/Alexjptz/hv-node/main/install-vpn-server.sh | bash
@@ -50,12 +50,12 @@ INSTALL_DIR="/root/hv-node"
 GITHUB_REPO="https://github.com/Alexjptz/hv-node.git"
 BRANCH="main"
 
-# Определение публичного IP (только IPv4 для AGENT_URL)
+# Определение публичного IP
 get_public_ip() {
-    PUBLIC_IP=$(curl -4 -s --max-time 5 ifconfig.me 2>/dev/null || \
-               curl -4 -s --max-time 5 icanhazip.com 2>/dev/null || \
-               curl -4 -s --max-time 5 ipinfo.io/ip 2>/dev/null || \
-               hostname -I | tr ' ' '\n' | grep -v ':' | head -1 || \
+    PUBLIC_IP=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || \
+               curl -s --max-time 5 icanhazip.com 2>/dev/null || \
+               curl -s --max-time 5 ipinfo.io/ip 2>/dev/null || \
+               hostname -I | awk '{print $1}' || \
                echo "")
     echo "$PUBLIC_IP"
 }
@@ -76,6 +76,19 @@ step "Шаг 1/8: Обновление системы..."
 apt update -qq
 apt upgrade -y -qq
 success "Система обновлена"
+echo ""
+
+# Шаг 1.5: Синхронизация времени (NTP) — критично для VLESS Reality, иначе timeout
+step "Настройка NTP (синхронизация времени)..."
+if command -v timedatectl &> /dev/null; then
+    timedatectl set-ntp true 2>/dev/null || true
+    systemctl enable systemd-timesyncd 2>/dev/null || true
+    systemctl start systemd-timesyncd 2>/dev/null || true
+    info "Текущее время: $(date -Iseconds)"
+    success "NTP включён (важно для VLESS Reality — рассинхрон даёт timeout)"
+else
+    apt install -y -qq chrony 2>/dev/null && systemctl enable chrony && systemctl start chrony || warning "NTP не настроен — при timeout проверьте время: date"
+fi
 echo ""
 
 # Шаг 2: Установка базовых инструментов
@@ -172,14 +185,8 @@ if [ ! -d "$INSTALL_DIR" ]; then
     # Настройка sparse checkout (если поддерживается)
     if [ -d ".git" ]; then
         git sparse-checkout init --cone >/dev/null 2>&1 || true
-        git sparse-checkout set xray-agent security-setup.sh >/dev/null 2>&1 || true
+        git sparse-checkout set xray-agent >/dev/null 2>&1 || true
     fi
-
-fi
-
-# Делаем security-setup.sh исполняемым (если есть в репозитории)
-if [ -f "$INSTALL_DIR/security-setup.sh" ]; then
-    chmod +x "$INSTALL_DIR/security-setup.sh"
 fi
 
 XRAY_AGENT_REL="xray-agent"
@@ -393,19 +400,4 @@ echo "  3. Проверьте метрики в админ-панели"
 echo ""
 warning "⚠️  ВАЖНО: Убедитесь, что AGENT_API_KEY и SERVER_ID корректны!"
 warning "⚠️  Если агент не регистрируется, проверьте CORE_API_URL и доступность Core API"
-echo ""
-read -p "Запустить настройку безопасности (security-setup.sh) сейчас? (y/N): " -n 1 -r < /dev/tty
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    if [ -f "$INSTALL_DIR/security-setup.sh" ]; then
-        info "Запуск security-setup.sh..."
-        "$INSTALL_DIR/security-setup.sh" --prod
-    else
-        warning "Файл security-setup.sh не найден. Запустите позже:"
-        info "  cd $INSTALL_DIR && sudo ./security-setup.sh --prod"
-    fi
-else
-    info "Запустите настройку безопасности позже:"
-    echo "  cd $INSTALL_DIR && sudo ./security-setup.sh --prod"
-fi
 echo ""
