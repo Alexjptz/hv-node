@@ -29,14 +29,14 @@ def load_xray_config() -> dict[str, Any]:
     with open(config_path, "r", encoding="utf-8") as f:
         config = json.load(f)
 
-    # Миграция: maxTimeDiff 0, 30, 300 → 10 (строгая replay protection)
+    # Миграция: maxTimeDiff 0, 10, 30, 300 → 2 (максимальная replay protection)
     for inbound in config.get("inbounds", []):
         if inbound.get("protocol") == "vless":
             reality = inbound.get("streamSettings", {}).get("realitySettings", {})
             current = reality.get("maxTimeDiff")
-            if current in (0, 30, 300):
-                reality["maxTimeDiff"] = 10
-                logger.info("Migrated maxTimeDiff %s→10 (replay protection)", current)
+            if current in (0, 10, 30, 300):
+                reality["maxTimeDiff"] = 2
+                logger.info("Migrated maxTimeDiff %s→2 (replay protection)", current)
                 try:
                     save_xray_config(config)
                     reload_xray()
@@ -279,7 +279,7 @@ def get_default_config() -> dict[str, Any]:
                         "privateKey": private_key_base64,  # Private key in base64 format for XRay Reality (XRay requires base64, not hex!)
                         "minClientVer": "",
                         "maxClientVer": "",
-                        "maxTimeDiff": 10,  # 10 sec — строгая replay protection (0=off)
+                        "maxTimeDiff": 2,  # 2 sec — максимальная replay protection (0=off)
                         "shortIds": short_ids  # List of short IDs
                     },
                     "tcpSettings": {
