@@ -29,6 +29,20 @@ def load_xray_config() -> dict[str, Any]:
     with open(config_path, "r", encoding="utf-8") as f:
         config = json.load(f)
 
+    # Миграция: maxTimeDiff 0 → 300 (рассинхрон даёт timeout)
+    for inbound in config.get("inbounds", []):
+        if inbound.get("protocol") == "vless":
+            reality = inbound.get("streamSettings", {}).get("realitySettings", {})
+            if reality.get("maxTimeDiff") == 0:
+                reality["maxTimeDiff"] = 300
+                logger.info("Migrated maxTimeDiff 0→300 (fix timeout from time drift)")
+                try:
+                    save_xray_config(config)
+                    reload_xray()
+                except Exception as e:
+                    logger.warning("Migration save/reload failed", error=str(e))
+                break
+
     logger.debug("XRay config loaded", path=str(config_path))
     return config
 
