@@ -3,9 +3,9 @@
 # Быстрая установка и настройка VPN сервера с XRay Agent
 #
 # Использование:
-#   curl -sSL https://raw.githubusercontent.com/Alexjptz/HomeVPN-VPN-Node/main/install-vpn-server.sh | bash
+#   curl -sSL https://raw.githubusercontent.com/Alexjptz/hv-node/main/install-vpn-server.sh | bash
 #   или
-#   wget -qO- https://raw.githubusercontent.com/Alexjptz/HomeVPN-VPN-Node/main/install-vpn-server.sh | bash
+#   wget -qO- https://raw.githubusercontent.com/Alexjptz/hv-node/main/install-vpn-server.sh | bash
 
 set -euo pipefail
 
@@ -47,7 +47,7 @@ fi
 
 # Переменные
 INSTALL_DIR="/root/homevpn-vpn-server"
-GITHUB_REPO="https://github.com/Alexjptz/HomeVPN-VPN-Node.git"
+GITHUB_REPO="https://github.com/Alexjptz/hv-node.git"
 BRANCH="main"
 
 # Определение публичного IP

@@ -22,7 +22,7 @@ ssh root@YOUR_SERVER_IP
 
 ## Шаг 2. Установить VPN-ноду (основной шаг)
 ```bash
-curl -sSL https://raw.githubusercontent.com/Alexjptz/HomeVPN-VPN-Node/main/install-vpn-server.sh | bash
+curl -sSL https://raw.githubusercontent.com/Alexjptz/hv-node/main/install-vpn-server.sh | bash
 ```
 
 Скрипт спросит:
@@ -50,7 +50,7 @@ curl http://localhost:8080/health
 
 ## Шаг 4 (опционально, но рекомендуется). Усилить безопасность хоста
 ```bash
-curl -sSL https://raw.githubusercontent.com/Alexjptz/HomeVPN-VPN-Node/main/setup-vpn-server.sh -o setup-vpn-server.sh
+curl -sSL https://raw.githubusercontent.com/Alexjptz/hv-node/main/setup-vpn-server.sh -o setup-vpn-server.sh
 chmod +x setup-vpn-server.sh
 sudo ./setup-vpn-server.sh --prod
 ```
