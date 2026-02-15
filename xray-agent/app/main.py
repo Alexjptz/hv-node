@@ -2,9 +2,10 @@
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Security
 
 from app.api.agent import router as agent_router
+from app.core.security import verify_api_key
 from app.core.config import settings
 from app.core.logging import get_logger, setup_logging
 from app.services.core_api_client import CoreAPIClient
@@ -173,11 +174,11 @@ app.include_router(agent_router)
 
 
 @app.get("/metrics")
-async def metrics():
+async def metrics(api_key: str = Security(verify_api_key)):
     """Prometheus metrics endpoint.
 
     Returns basic metrics in Prometheus format.
-    For full Prometheus integration, consider using prometheus_client library.
+    Requires X-API-Key header (same as /status, /reality).
     """
     from fastapi import Response
     from app.services.xray_manager import get_xray_status
