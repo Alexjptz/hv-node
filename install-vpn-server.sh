@@ -50,12 +50,12 @@ INSTALL_DIR="/root/hv-node"
 GITHUB_REPO="https://github.com/Alexjptz/hv-node.git"
 BRANCH="main"
 
-# Определение публичного IP
+# Определение публичного IP (только IPv4 для AGENT_URL)
 get_public_ip() {
-    PUBLIC_IP=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || \
-               curl -s --max-time 5 icanhazip.com 2>/dev/null || \
-               curl -s --max-time 5 ipinfo.io/ip 2>/dev/null || \
-               hostname -I | awk '{print $1}' || \
+    PUBLIC_IP=$(curl -4 -s --max-time 5 ifconfig.me 2>/dev/null || \
+               curl -4 -s --max-time 5 icanhazip.com 2>/dev/null || \
+               curl -4 -s --max-time 5 ipinfo.io/ip 2>/dev/null || \
+               hostname -I | tr ' ' '\n' | grep -v ':' | head -1 || \
                echo "")
     echo "$PUBLIC_IP"
 }
