@@ -29,19 +29,20 @@ def load_xray_config() -> dict[str, Any]:
     with open(config_path, "r", encoding="utf-8") as f:
         config = json.load(f)
 
-    # Миграция: maxTimeDiff 0, 10, 30, 300 → 2 (максимальная replay protection)
+    # Принудительно отключаем проверку разницы времени для Reality (maxTimeDiff=0).
+    # Это снижает защиту от replay, но убирает ложные timeout при clock drift на клиентах.
     for inbound in config.get("inbounds", []):
         if inbound.get("protocol") == "vless":
             reality = inbound.get("streamSettings", {}).get("realitySettings", {})
             current = reality.get("maxTimeDiff")
-            if current in (0, 10, 30, 300):
-                reality["maxTimeDiff"] = 2
-                logger.info("Migrated maxTimeDiff %s→2 (replay protection)", current)
+            if current != 0:
+                reality["maxTimeDiff"] = 0
+                logger.info("Forced maxTimeDiff %s→0 (disabled)", current)
                 try:
                     save_xray_config(config)
                     reload_xray()
                 except Exception as e:
-                    logger.warning("Migration save/reload failed", error=str(e))
+                    logger.warning("maxTimeDiff force save/reload failed", error=str(e))
                 break
 
     logger.debug("XRay config loaded", path=str(config_path))
@@ -67,18 +68,17 @@ def validate_xray_config(config: dict[str, Any]) -> tuple[bool, str | None]:
                 json.dump(config, tmp_file, indent=2, ensure_ascii=False)
 
             # Copy temp file to container's filesystem for validation
-            # Or validate directly by copying config content
-            # Try both container names (development and production)
-            # Use docker cp to copy file into container, then test
+            # Try container names (docker compose may add project prefix: hv-node_homevpn_xray_server)
             container_name = None
-            for name in ['homevpn_xray_server', 'xray-server']:
+            for pattern in ['homevpn_xray_server_vpn_node', 'homevpn_xray_server', 'xray-server', 'xray_server']:
                 result = subprocess.run(
-                    f"docker ps --format '{{{{.Names}}}}' | grep -q '^{name}$'",
+                    f"docker ps --format '{{{{.Names}}}}' | grep -E '{pattern}$' | head -1",
                     shell=True,
                     capture_output=True,
+                    text=True,
                 )
-                if result.returncode == 0:
-                    container_name = name
+                if result.returncode == 0 and result.stdout.strip():
+                    container_name = result.stdout.strip()
                     break
 
             if container_name:
@@ -279,7 +279,7 @@ def get_default_config() -> dict[str, Any]:
                         "privateKey": private_key_base64,  # Private key in base64 format for XRay Reality (XRay requires base64, not hex!)
                         "minClientVer": "",
                         "maxClientVer": "",
-                        "maxTimeDiff": 2,  # 2 sec — максимальная replay protection (0=off)
+                        "maxTimeDiff": 0,  # Disabled: avoid client timeout caused by clock drift
                         "shortIds": short_ids  # List of short IDs
                     },
                     "tcpSettings": {
@@ -545,24 +545,73 @@ def restart_xray() -> bool:
     Returns:
         True if restart successful, False otherwise
     """
-    try:
-        # Try docker restart first (if XRay runs in Docker)
+    def _run(command: str, timeout: int = 60) -> tuple[bool, str]:
+        """Run shell command and return (success, combined_output)."""
         result = subprocess.run(
-            "docker restart xray-server || docker restart homevpn_xray_server || systemctl restart xray || service xray restart",
+            command,
             shell=True,
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=timeout,
         )
-        if result.returncode == 0:
-            logger.info("XRay restarted successfully")
-            # Mark XRay reload in cache and sync cache from config
-            user_cache.mark_xray_reloaded()
-            user_cache.sync_from_config()
+        output = "\n".join([x for x in [result.stdout, result.stderr] if x]).strip()
+        return result.returncode == 0, output
+
+    def _sync_user_cache() -> None:
+        """Refresh in-memory cache after restart/reload."""
+        from app.services.user_cache import user_cache as _user_cache
+        _user_cache.mark_xray_reloaded()
+        _user_cache.sync_from_config()
+
+    try:
+        # 1) Try known container names first.
+        for name in [
+            "homevpn_xray_server_vpn_node",
+            "homevpn_xray_server",
+            "xray-server",
+            "xray_server",
+        ]:
+            ok, out = _run(f"docker restart {name}", timeout=40)
+            if ok:
+                logger.info("XRay container restarted", container=name)
+                _sync_user_cache()
+                return True
+            if out:
+                logger.debug("Restart attempt failed", container=name, output=out)
+
+        # 2) Try autodiscovery by image/name (works for custom project/container names).
+        ok, discovered = _run(
+            "docker ps --format '{{.Names}} {{.Image}}' | awk '/xray|Xray|teddysun\\/xray/ {print $1; exit}'",
+            timeout=10,
+        )
+        container_name = discovered.strip() if ok else ""
+        if container_name:
+            ok, out = _run(f"docker restart {container_name}", timeout=40)
+            if ok:
+                logger.info("XRay container restarted (auto-discovered)", container=container_name)
+                _sync_user_cache()
+                return True
+            if out:
+                logger.debug("Auto-discovered restart failed", container=container_name, output=out)
+
+        # 3) Fallback to service manager (non-docker setups).
+        for svc_cmd in ["systemctl restart xray", "service xray restart"]:
+            ok, out = _run(svc_cmd, timeout=40)
+            if ok:
+                logger.info("XRay service restarted", command=svc_cmd)
+                _sync_user_cache()
+                return True
+            if out:
+                logger.debug("Service restart attempt failed", command=svc_cmd, output=out)
+
+        # 4) Last resort: config reload is better than hard failure.
+        if reload_xray():
+            logger.warning("Restart failed, fallback to reload_xray succeeded")
+            _sync_user_cache()
             return True
-        else:
-            logger.error("XRay restart failed", stderr=result.stderr, stdout=result.stdout)
-            return False
+
+        logger.error("XRay restart failed: all restart/reload strategies exhausted")
+        return False
     except subprocess.TimeoutExpired:
         logger.error("XRay restart timeout")
         return False

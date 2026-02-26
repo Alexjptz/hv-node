@@ -110,13 +110,30 @@ step "Шаг 3/8: Установка Docker и Docker Compose..."
 if ! command -v docker &> /dev/null; then
     info "Установка Docker из официального репозитория..."
 
+    # Поддержка свежих дистрибутивов Ubuntu/Debian
+    . /etc/os-release
+    OS_ID="${ID:-}"
+    OS_CODENAME="${VERSION_CODENAME:-}"
+    if [ -z "${OS_CODENAME}" ] && [ -n "${UBUNTU_CODENAME:-}" ]; then
+        OS_CODENAME="${UBUNTU_CODENAME}"
+    fi
+    if [[ "${OS_ID}" != "ubuntu" && "${OS_ID}" != "debian" ]]; then
+        error "Неподдерживаемый дистрибутив для автоустановки Docker: ${OS_ID}"
+        error "Поддерживаются: ubuntu, debian"
+        exit 1
+    fi
+    if [ -z "${OS_CODENAME}" ]; then
+        error "Не удалось определить VERSION_CODENAME для ${OS_ID}"
+        exit 1
+    fi
+
     install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    curl -fsSL "https://download.docker.com/linux/${OS_ID}/gpg" -o /etc/apt/keyrings/docker.asc
     chmod a+r /etc/apt/keyrings/docker.asc
 
     echo \
-      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-      $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${OS_ID} \
+      ${OS_CODENAME} stable" | \
       tee /etc/apt/sources.list.d/docker.list > /dev/null
 
     apt update -qq
@@ -243,7 +260,7 @@ services:
       start_period: 40s
 
   xray-server:
-    image: teddysun/xray:1.8.11
+    image: teddysun/xray:latest
     container_name: homevpn_xray_server
     ports:
       - "433:433"
