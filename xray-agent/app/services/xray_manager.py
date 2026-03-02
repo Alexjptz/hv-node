@@ -642,7 +642,7 @@ def restart_agent() -> bool:
         for name in ["homevpn_xray_agent", "xray-agent", "xray_agent"]:
             ok, out = _run(
                 f'curl -sf --unix-socket /var/run/docker.sock '
-                f'-X POST "http://localhost/v1.41/containers/{name}/restart"',
+                f'-X POST "http://localhost/v1.44/containers/{name}/restart"',
                 timeout=15,
             )
             if ok:
@@ -671,7 +671,7 @@ def restart_agent() -> bool:
                 cid = out.strip().split("\n")[0]
                 ok, _ = _run(
                     f'curl -sf --unix-socket /var/run/docker.sock '
-                    f'-X POST "http://localhost/v1.41/containers/{cid}/restart"',
+                    f'-X POST "http://localhost/v1.44/containers/{cid}/restart"',
                     timeout=15,
                 )
                 if ok:
