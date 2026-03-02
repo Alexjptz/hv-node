@@ -233,6 +233,27 @@ async def get_status(api_key: str = Security(verify_api_key)) -> dict[str, Any]:
     }
 
 
+@router.get("/users")
+async def get_xray_users(api_key: str = Security(verify_api_key)) -> dict[str, Any]:
+    """Get list of user UUIDs in XRay config (for sync verification)."""
+    from app.services.xray_manager import load_xray_config
+
+    uuids = []
+    try:
+        config = load_xray_config()
+        for inbound in config.get("inbounds", []):
+            if inbound.get("protocol") == "vless":
+                clients = inbound.get("settings", {}).get("clients", [])
+                for c in clients:
+                    uid = c.get("id")  # VLESS uses "id" for UUID
+                    if uid:
+                        uuids.append(uid)
+                break
+    except Exception as e:
+        logger.error("Failed to get XRay users", error=str(e))
+    return {"users": uuids, "count": len(uuids)}
+
+
 @router.get("/reality")
 async def get_reality_config(api_key: str = Security(verify_api_key)) -> dict[str, Any]:
     """Get Reality configuration parameters.

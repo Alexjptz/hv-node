@@ -70,7 +70,7 @@ def validate_xray_config(config: dict[str, Any]) -> tuple[bool, str | None]:
             # Copy temp file to container's filesystem for validation
             # Try container names (docker compose may add project prefix: hv-node_homevpn_xray_server)
             container_name = None
-            for pattern in ['homevpn_xray_server_vpn_node', 'homevpn_xray_server', 'xray-server', 'xray_server']:
+            for pattern in ['homevpn_xray_server', 'xray-server', 'xray_server']:
                 result = subprocess.run(
                     f"docker ps --format '{{{{.Names}}}}' | grep -E '{pattern}$' | head -1",
                     shell=True,
@@ -566,7 +566,6 @@ def restart_xray() -> bool:
     try:
         # 1) Try known container names first.
         for name in [
-            "homevpn_xray_server_vpn_node",
             "homevpn_xray_server",
             "xray-server",
             "xray_server",

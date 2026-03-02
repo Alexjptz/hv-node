@@ -70,10 +70,12 @@ class XRayGRPCClient:
         Returns:
             gRPC server address
         """
-        # Пробуем подключиться через docker network имя контейнера
-        # Или используем host.docker.internal если доступно
-        # Или используем IP адрес контейнера xray_server
-        return "homevpn_xray_server:10085"  # Через docker network
+        # Используем XRAY_API_ADDRESS из env (например homevpn_xray_server_vpn_node:10085)
+        # или fallback на стандартное имя контейнера
+        addr = settings.xray_api_address
+        if addr and addr != "127.0.0.1:10085":
+            return addr
+        return "homevpn_xray_server:10085"  # Через docker network (default)
 
     def _call_xray_api_via_command(self, command: str, user_json: str) -> bool:
         """Call XRay API using xray api command (adu/rmu).
@@ -86,13 +88,15 @@ class XRayGRPCClient:
             True if successful, False otherwise
         """
         try:
+            # Имя контейнера из grpc_address (host:port -> host)
+            container_name = self.grpc_address.split(":")[0]
             # Используем команду xray api adu/rmu через docker exec
             # Формат: echo '{"email":"...","level":0,"account":{"id":"...","flow":"..."}}' | xray api adu vless
             cmd = [
                 "docker",
                 "exec",
                 "-i",  # Interactive mode для stdin
-                "homevpn_xray_server",
+                container_name,
                 "xray",
                 "api",
                 command,
