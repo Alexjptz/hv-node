@@ -564,10 +564,27 @@ def restart_xray() -> bool:
         _user_cache.sync_from_config()
 
     try:
-        # 1) Try known container names first.
+        # 1) Docker API via curl (most reliable, same as restart_agent)
         for name in [
-            "homevpn_xray_server_vpn_node",
             "homevpn_xray_server",
+            "homevpn_xray_server_vpn_node",
+            "xray-server",
+            "xray_server",
+        ]:
+            ok, _ = _run(
+                f'curl -sf --unix-socket /var/run/docker.sock '
+                f'-X POST "http://localhost/v1.53/containers/{name}/restart"',
+                timeout=15,
+            )
+            if ok:
+                logger.info("XRay container restarted via API", container=name)
+                _sync_user_cache()
+                return True
+
+        # 2) docker CLI fallback
+        for name in [
+            "homevpn_xray_server",
+            "homevpn_xray_server_vpn_node",
             "xray-server",
             "xray_server",
         ]:
@@ -577,24 +594,31 @@ def restart_xray() -> bool:
                 _sync_user_cache()
                 return True
             if out:
-                logger.debug("Restart attempt failed", container=name, output=out)
+                logger.debug("Restart attempt failed", container=name, output=out[:200])
 
-        # 2) Try autodiscovery by image/name (works for custom project/container names).
+        # 3) Autodiscovery by image/name
         ok, discovered = _run(
             "docker ps --format '{{.Names}} {{.Image}}' | awk '/xray|Xray|teddysun\\/xray/ {print $1; exit}'",
             timeout=10,
         )
         container_name = discovered.strip() if ok else ""
         if container_name:
-            ok, out = _run(f"docker restart {container_name}", timeout=40)
+            ok, _ = _run(
+                f'curl -sf --unix-socket /var/run/docker.sock '
+                f'-X POST "http://localhost/v1.53/containers/{container_name}/restart"',
+                timeout=15,
+            )
             if ok:
-                logger.info("XRay container restarted (auto-discovered)", container=container_name)
+                logger.info("XRay container restarted via API (discovered)", container=container_name)
                 _sync_user_cache()
                 return True
-            if out:
-                logger.debug("Auto-discovered restart failed", container=container_name, output=out)
+            ok, out = _run(f"docker restart {container_name}", timeout=40)
+            if ok:
+                logger.info("XRay container restarted (discovered)", container=container_name)
+                _sync_user_cache()
+                return True
 
-        # 3) Fallback to service manager (non-docker setups).
+        # 4) Fallback to service manager (non-docker setups)
         for svc_cmd in ["systemctl restart xray", "service xray restart"]:
             ok, out = _run(svc_cmd, timeout=40)
             if ok:
@@ -602,9 +626,9 @@ def restart_xray() -> bool:
                 _sync_user_cache()
                 return True
             if out:
-                logger.debug("Service restart attempt failed", command=svc_cmd, output=out)
+                logger.debug("Service restart attempt failed", command=svc_cmd, output=out[:200])
 
-        # 4) Last resort: config reload is better than hard failure.
+        # 5) Last resort: config reload
         if reload_xray():
             logger.warning("Restart failed, fallback to reload_xray succeeded")
             _sync_user_cache()
