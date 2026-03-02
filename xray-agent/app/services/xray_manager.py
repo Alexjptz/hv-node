@@ -638,7 +638,16 @@ def restart_agent() -> bool:
         return result.returncode == 0, output
 
     try:
-        # Find agent container by compose label or name
+        # 1) Try known container names from install-vpn-server.sh
+        for name in ["homevpn_xray_agent", "xray-agent", "xray_agent"]:
+            ok, out = _run(f"docker restart {name}", timeout=30)
+            if ok:
+                logger.info("Agent container restarted", container=name)
+                return True
+            if "No such container" not in out and out:
+                logger.debug("Restart attempt", container=name, output=out)
+
+        # 2) Find by label or name filter
         for filter_arg in [
             "--filter label=com.docker.compose.service=xray-agent",
             "--filter name=xray-agent",
@@ -647,10 +656,11 @@ def restart_agent() -> bool:
             ok, out = _run(f"docker ps -q {filter_arg}", timeout=10)
             if ok and out.strip():
                 container_id = out.strip().split("\n")[0]
-                ok, _ = _run(f"docker restart {container_id}", timeout=30)
+                ok, out = _run(f"docker restart {container_id}", timeout=30)
                 if ok:
-                    logger.info("Agent container restart initiated", container=container_id)
+                    logger.info("Agent container restarted", container=container_id)
                     return True
+                logger.warning("Restart failed", container_id=container_id, output=out)
 
         logger.warning("Agent container not found for self-restart")
         return False
