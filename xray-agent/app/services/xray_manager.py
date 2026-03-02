@@ -638,16 +638,29 @@ def restart_agent() -> bool:
         return result.returncode == 0, output
 
     try:
-        # 1) Try known container names from install-vpn-server.sh
+        # 1) Docker API via curl (most reliable, works with :ro socket)
+        for name in ["homevpn_xray_agent", "xray-agent", "xray_agent"]:
+            ok, out = _run(
+                f'curl -sf --unix-socket /var/run/docker.sock '
+                f'-X POST "http://localhost/v1.41/containers/{name}/restart"',
+                timeout=15,
+            )
+            if ok:
+                logger.info("Agent container restarted via API", container=name)
+                return True
+            if out:
+                logger.debug("API restart attempt", container=name, output=out[:200])
+
+        # 2) docker CLI
         for name in ["homevpn_xray_agent", "xray-agent", "xray_agent"]:
             ok, out = _run(f"docker restart {name}", timeout=30)
             if ok:
                 logger.info("Agent container restarted", container=name)
                 return True
-            if "No such container" not in out and out:
-                logger.debug("Restart attempt", container=name, output=out)
+            if out:
+                logger.debug("CLI restart attempt", container=name, output=out[:200])
 
-        # 2) Find by label or name filter
+        # 3) Find by filter
         for filter_arg in [
             "--filter label=com.docker.compose.service=xray-agent",
             "--filter name=xray-agent",
@@ -655,12 +668,15 @@ def restart_agent() -> bool:
         ]:
             ok, out = _run(f"docker ps -q {filter_arg}", timeout=10)
             if ok and out.strip():
-                container_id = out.strip().split("\n")[0]
-                ok, out = _run(f"docker restart {container_id}", timeout=30)
+                cid = out.strip().split("\n")[0]
+                ok, _ = _run(
+                    f'curl -sf --unix-socket /var/run/docker.sock '
+                    f'-X POST "http://localhost/v1.41/containers/{cid}/restart"',
+                    timeout=15,
+                )
                 if ok:
-                    logger.info("Agent container restarted", container=container_id)
+                    logger.info("Agent container restarted via API", container=cid)
                     return True
-                logger.warning("Restart failed", container_id=container_id, output=out)
 
         logger.warning("Agent container not found for self-restart")
         return False
