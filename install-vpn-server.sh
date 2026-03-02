@@ -247,7 +247,7 @@ services:
         condition: service_started
     volumes:
       - xray_config:/etc/xray
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/docker.sock:/var/run/docker.sock
       - ./logs/xray-agent:/app/logs
     networks:
       - homevpn_network
