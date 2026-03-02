@@ -70,7 +70,7 @@ def validate_xray_config(config: dict[str, Any]) -> tuple[bool, str | None]:
             # Copy temp file to container's filesystem for validation
             # Try container names (docker compose may add project prefix: hv-node_homevpn_xray_server)
             container_name = None
-            for pattern in ['homevpn_xray_server', 'xray-server', 'xray_server']:
+            for pattern in ['homevpn_xray_server_vpn_node', 'homevpn_xray_server', 'xray-server', 'xray_server']:
                 result = subprocess.run(
                     f"docker ps --format '{{{{.Names}}}}' | grep -E '{pattern}$' | head -1",
                     shell=True,
@@ -566,6 +566,7 @@ def restart_xray() -> bool:
     try:
         # 1) Try known container names first.
         for name in [
+            "homevpn_xray_server_vpn_node",
             "homevpn_xray_server",
             "xray-server",
             "xray_server",
@@ -616,6 +617,45 @@ def restart_xray() -> bool:
         return False
     except Exception as e:
         logger.error("Error restarting XRay", error=str(e))
+        return False
+
+
+def restart_agent() -> bool:
+    """Restart xray-agent container (self-restart via Docker socket).
+
+    Returns:
+        True if restart was initiated successfully
+    """
+    def _run(command: str, timeout: int = 15) -> tuple[bool, str]:
+        result = subprocess.run(
+            command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        output = "\n".join([x for x in [result.stdout, result.stderr] if x]).strip()
+        return result.returncode == 0, output
+
+    try:
+        # Find agent container by compose label or name
+        for filter_arg in [
+            "--filter label=com.docker.compose.service=xray-agent",
+            "--filter name=xray-agent",
+            "--filter name=xray_agent",
+        ]:
+            ok, out = _run(f"docker ps -q {filter_arg}", timeout=10)
+            if ok and out.strip():
+                container_id = out.strip().split("\n")[0]
+                ok, _ = _run(f"docker restart {container_id}", timeout=30)
+                if ok:
+                    logger.info("Agent container restart initiated", container=container_id)
+                    return True
+
+        logger.warning("Agent container not found for self-restart")
+        return False
+    except Exception as e:
+        logger.error("Error restarting agent", error=str(e))
         return False
 
 

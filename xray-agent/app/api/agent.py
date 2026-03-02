@@ -13,6 +13,7 @@ from app.services.xray_manager import (
     regenerate_user_in_config,
     reload_xray,
     remove_user_from_config,
+    restart_agent,
     restart_xray,
 )
 from app.services.xray_api import (
@@ -54,6 +55,18 @@ async def receive_command(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to restart XRay",
             )
+
+    if request.command == "restart_agent":
+        import threading
+        import time
+
+        def _delayed_restart():
+            time.sleep(2)  # Allow HTTP response to be sent first
+            restart_agent()
+
+        threading.Thread(target=_delayed_restart, daemon=True).start()
+        logger.info("Agent restart initiated")
+        return {"success": True, "message": "Agent restart initiated"}
 
     # Handle regenerate_user command (requires both old and new UUID)
     if request.command == "regenerate_user":
